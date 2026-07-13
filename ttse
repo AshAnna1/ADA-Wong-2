@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BIN="$SCRIPT_DIR/ttse-controller"
+
+if [[ ! -x "$BIN" ]]; then
+  echo "TTSE controller not built: $BIN" >&2
+  exit 1
+fi
+
+case "${1:-help}" in
+  start)
+    TTSE_PATH="${TTSE_PATH:-$(pwd)}" "$BIN" start
+    ;;
+  status)
+    "$BIN" status
+    ;;
+  commit)
+    "$BIN" commit
+    ;;
+  undo)
+    "$BIN" undo
+    ;;
+  help|--help|-h)
+    cat <<'EOF'
+TTSE commands:
+  ttse start      Create an overlay sandbox for the current directory
+  ttse status     Show transaction state
+  ttse commit     Commit sandboxed changes (placeholder in this environment)
+  ttse undo       Reset the transaction workspace
+EOF
+    ;;
+  *)
+    echo "unknown ttse command: $1" >&2
+    exit 2
+    ;;
+ esac
