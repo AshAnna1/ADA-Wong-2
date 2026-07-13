@@ -3,3 +3,7 @@
 
 # Ada Library Information
 *.ali
+
+# Local build artifacts
+/ttse-controller
+*.exe
