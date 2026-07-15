@@ -10,6 +10,8 @@ This repository contains a minimal TTSE implementation for a Bash environment.
 
 ## Build and use
 
+Current tool version: v1.2
+
 ```bash
 cd /workspaces/ADA-Wong-2
 GOOS=linux GOARCH=amd64 go build -o ttse-controller ./main.go
