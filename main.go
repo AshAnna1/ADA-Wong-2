@@ -11,16 +11,24 @@ import (
 	"time"
 )
 
-const toolVersion = "v1.2"
+const toolVersion = "v1.3"
+
+type historyEntry struct {
+	Action    string `json:"action"`
+	Step      int    `json:"step"`
+	Timestamp string `json:"timestamp"`
+}
 
 type statusReport struct {
-	Active               bool   `json:"active"`
-	Path                 string `json:"path"`
-	Step                 int    `json:"step"`
-	Notes                string `json:"notes"`
-	HasSysAdmin          bool   `json:"has_sys_admin"`
-	HasCheckpointRestore bool   `json:"has_checkpoint_restore"`
-	CriuAvailable        bool   `json:"criu_available"`
+	Active               bool           `json:"active"`
+	Path                 string         `json:"path"`
+	Step                 int            `json:"step"`
+	Notes                string         `json:"notes"`
+	HasSysAdmin          bool           `json:"has_sys_admin"`
+	HasCheckpointRestore bool           `json:"has_checkpoint_restore"`
+	CriuAvailable        bool           `json:"criu_available"`
+	LastAction           string         `json:"last_action,omitempty"`
+	History              []historyEntry `json:"history,omitempty"`
 }
 
 func main() {
@@ -93,7 +101,7 @@ func prepareSandbox(sandboxRoot string) (int, error) {
 		return 0, err
 	}
 
-	dirs := []string{"upper", "work", "merged", "checkpoints"}
+	dirs := []string{"upper", "work", "merged", "checkpoints", "commits"}
 	for _, name := range dirs {
 		p := filepath.Join(sandboxRoot, name)
 		if err := os.MkdirAll(p, 0o755); err != nil {
@@ -119,6 +127,79 @@ func prepareSandbox(sandboxRoot string) (int, error) {
 		return 0, err
 	}
 	return step, nil
+}
+
+func appendHistory(sandboxRoot, action string, step int) error {
+	if err := os.MkdirAll(sandboxRoot, 0o755); err != nil {
+		return err
+	}
+
+	entry := historyEntry{Action: action, Step: step, Timestamp: time.Now().UTC().Format(time.RFC3339)}
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return err
+	}
+
+	historyPath := filepath.Join(sandboxRoot, "history.jsonl")
+	f, err := os.OpenFile(historyPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = f.WriteString(string(data) + "\n")
+	return err
+}
+
+func readHistory(sandboxRoot string) ([]historyEntry, error) {
+	historyPath := filepath.Join(sandboxRoot, "history.jsonl")
+	data, err := os.ReadFile(historyPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	entries := make([]historyEntry, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var entry historyEntry
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+	return entries, nil
+}
+
+func writeSnapshot(sandboxRoot, action string, step int, base string) error {
+	if err := os.MkdirAll(filepath.Join(sandboxRoot, "commits"), 0o755); err != nil {
+		return err
+	}
+
+	snapshot := struct {
+		Action    string `json:"action"`
+		Base      string `json:"base"`
+		Step      int    `json:"step"`
+		Timestamp string `json:"timestamp"`
+	}{
+		Action:    action,
+		Base:      base,
+		Step:      step,
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+	}
+	data, err := json.MarshalIndent(snapshot, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	snapshotPath := filepath.Join(sandboxRoot, "commits", fmt.Sprintf("%s-%d.json", action, step))
+	return os.WriteFile(snapshotPath, data, 0o644)
 }
 
 func cleanupSandbox(sandboxRoot string) error {
@@ -155,6 +236,10 @@ func runStart() {
 	step, err := prepareSandbox(sandboxRoot)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "prepare sandbox failed: %v\n", err)
+		os.Exit(1)
+	}
+	if err := appendHistory(sandboxRoot, "started", step); err != nil {
+		fmt.Fprintf(os.Stderr, "record history failed: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -197,6 +282,12 @@ func runStart() {
 			report.Notes = "criu binary not found"
 		}
 	}
+	history, err := readHistory(sandboxRoot)
+	if err == nil {
+		report.LastAction = "started"
+		report.History = history
+	}
+
 	data, _ := json.MarshalIndent(report, "", "  ")
 	fmt.Println(string(data))
 }
@@ -219,6 +310,10 @@ func runStatus() {
 			report.Active = true
 			report.Notes = "overlay workspace present"
 		}
+		if history, err := readHistory(sandboxRoot); err == nil && len(history) > 0 {
+			report.History = history
+			report.LastAction = history[len(history)-1].Action
+		}
 	}
 	data, _ := json.MarshalIndent(report, "", "  ")
 	fmt.Println(string(data))
@@ -234,11 +329,27 @@ func runCommit() {
 	upper := filepath.Join(sandboxRoot, "upper")
 	merged := filepath.Join(sandboxRoot, "merged")
 	fmt.Printf("commit requested for %s into %s\n", upper, merged)
+
+	stepFile := filepath.Join(sandboxRoot, "step")
+	step := 0
+	if data, err := os.ReadFile(stepFile); err == nil {
+		if v, err := strconv.Atoi(strings.TrimSpace(string(data))); err == nil {
+			step = v
+		}
+	}
+	if err := writeSnapshot(sandboxRoot, "commit", step, merged); err != nil {
+		fmt.Fprintf(os.Stderr, "write snapshot failed: %v\n", err)
+		os.Exit(1)
+	}
+	if err := appendHistory(sandboxRoot, "committed", step); err != nil {
+		fmt.Fprintf(os.Stderr, "record history failed: %v\n", err)
+		os.Exit(1)
+	}
 	if err := cleanupSandbox(sandboxRoot); err != nil {
 		fmt.Fprintf(os.Stderr, "cleanup sandbox failed: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("transaction cleaned up")
+	fmt.Println("transaction committed and cleaned up")
 }
 
 func runUndo() {
@@ -248,7 +359,23 @@ func runUndo() {
 		os.Exit(1)
 	}
 
+	stepFile := filepath.Join(sandboxRoot, "step")
+	step := 0
+	if data, err := os.ReadFile(stepFile); err == nil {
+		if v, err := strconv.Atoi(strings.TrimSpace(string(data))); err == nil {
+			step = v
+		}
+	}
+
 	fmt.Println("undo requested; restoring the sandbox state")
+	if err := writeSnapshot(sandboxRoot, "undo", step, sandboxRoot); err != nil {
+		fmt.Fprintf(os.Stderr, "write snapshot failed: %v\n", err)
+		os.Exit(1)
+	}
+	if err := appendHistory(sandboxRoot, "undone", step); err != nil {
+		fmt.Fprintf(os.Stderr, "record history failed: %v\n", err)
+		os.Exit(1)
+	}
 	if err := cleanupSandbox(sandboxRoot); err != nil {
 		fmt.Fprintf(os.Stderr, "cleanup sandbox failed: %v\n", err)
 		os.Exit(1)

@@ -7,8 +7,26 @@ import (
 )
 
 func TestToolVersion(t *testing.T) {
-	if toolVersion != "v1.2" {
-		t.Fatalf("expected tool version v1.2, got %s", toolVersion)
+	if toolVersion != "v1.3" {
+		t.Fatalf("expected tool version v1.3, got %s", toolVersion)
+	}
+}
+
+func TestHistoryLog(t *testing.T) {
+	sandboxRoot := filepath.Join(t.TempDir(), "sandbox")
+	if err := appendHistory(sandboxRoot, "started", 1); err != nil {
+		t.Fatalf("appendHistory returned error: %v", err)
+	}
+
+	entries, err := readHistory(sandboxRoot)
+	if err != nil {
+		t.Fatalf("readHistory returned error: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 history entry, got %d", len(entries))
+	}
+	if entries[0].Action != "started" || entries[0].Step != 1 {
+		t.Fatalf("unexpected history entry: %+v", entries[0])
 	}
 }
 
