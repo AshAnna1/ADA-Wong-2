@@ -25,6 +25,9 @@ case "${1:-help}" in
   version|--version|-v)
     "$BIN" version
     ;;
+  docs)
+    "$BIN" docs
+    ;;
   help|--help|-h)
     cat <<'EOF'
 TTSE commands:
@@ -33,6 +36,7 @@ TTSE commands:
   ttse commit     Commit sandboxed changes (placeholder in this environment)
   ttse undo       Reset the transaction workspace
   ttse version   Show the tool version
+  ttse docs      Show the full user guide and command reference
 EOF
     ;;
   *)

@@ -12,6 +12,19 @@ func TestToolVersion(t *testing.T) {
 	}
 }
 
+func TestDocsContent(t *testing.T) {
+	content, err := loadDocsContent("docs/ttse-guide.md")
+	if err != nil {
+		t.Fatalf("loadDocsContent returned error: %v", err)
+	}
+	if content == "" {
+		t.Fatal("expected documentation content to be non-empty")
+	}
+	if !contains(content, "ttse start") || !contains(content, "ttse docs") {
+		t.Fatalf("expected documentation content to include usage examples, got %q", content)
+	}
+}
+
 func TestHistoryLog(t *testing.T) {
 	sandboxRoot := filepath.Join(t.TempDir(), "sandbox")
 	if err := appendHistory(sandboxRoot, "started", 1); err != nil {

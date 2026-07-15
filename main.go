@@ -11,6 +11,18 @@ import (
 	"time"
 )
 
+func contains(s, substr string) bool {
+	return strings.Contains(s, substr)
+}
+
+func loadDocsContent(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
 const toolVersion = "v1.3"
 
 type historyEntry struct {
@@ -52,6 +64,8 @@ func main() {
 		printVersion()
 	case "help", "--help", "-h":
 		printUsage()
+	case "docs":
+		printDocs()
 	default:
 		fmt.Printf("unknown command: %s\n", os.Args[1])
 		os.Exit(2)
@@ -63,7 +77,16 @@ func printVersion() {
 }
 
 func printUsage() {
-	fmt.Println("usage: ttse <start|status|commit|undo|daemon|version>")
+	fmt.Println("usage: ttse <start|status|commit|undo|daemon|version|docs>")
+}
+
+func printDocs() {
+	content, err := loadDocsContent(filepath.Join("docs", "ttse-guide.md"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "load documentation failed: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Print(content)
 }
 
 func detectCapabilities() (bool, bool, bool) {
