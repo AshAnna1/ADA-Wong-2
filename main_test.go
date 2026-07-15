@@ -6,6 +6,12 @@ import (
 	"testing"
 )
 
+func TestToolVersion(t *testing.T) {
+	if toolVersion != "v1.2" {
+		t.Fatalf("expected tool version v1.2, got %s", toolVersion)
+	}
+}
+
 func TestPrepareAndCleanupSandbox(t *testing.T) {
 	sandboxRoot := filepath.Join(t.TempDir(), "sandbox")
 

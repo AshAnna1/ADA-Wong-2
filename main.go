@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const toolVersion = "v1.1"
+const toolVersion = "v1.2"
 
 type statusReport struct {
 	Active               bool   `json:"active"`
