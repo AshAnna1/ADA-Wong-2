@@ -22,6 +22,9 @@ case "${1:-help}" in
   undo)
     "$BIN" undo
     ;;
+  version|--version|-v)
+    "$BIN" version
+    ;;
   help|--help|-h)
     cat <<'EOF'
 TTSE commands:
@@ -29,6 +32,7 @@ TTSE commands:
   ttse status     Show transaction state
   ttse commit     Commit sandboxed changes (placeholder in this environment)
   ttse undo       Reset the transaction workspace
+  ttse version   Show the tool version
 EOF
     ;;
   *)

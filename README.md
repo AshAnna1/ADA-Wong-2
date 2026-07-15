@@ -18,6 +18,7 @@ chmod +x ttse ttse-controller
 ./ttse status
 ./ttse commit
 ./ttse undo
+./ttse version
 ```
 
 ## Notes

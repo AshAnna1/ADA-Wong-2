@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const toolVersion = "v1.1"
+
 type statusReport struct {
 	Active               bool   `json:"active"`
 	Path                 string `json:"path"`
@@ -23,7 +25,7 @@ type statusReport struct {
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("usage: ttse <start|status|commit|undo|daemon>")
+		printUsage()
 		os.Exit(2)
 	}
 
@@ -38,10 +40,22 @@ func main() {
 		runUndo()
 	case "daemon":
 		runDaemon()
+	case "version", "--version", "-v":
+		printVersion()
+	case "help", "--help", "-h":
+		printUsage()
 	default:
 		fmt.Printf("unknown command: %s\n", os.Args[1])
 		os.Exit(2)
 	}
+}
+
+func printVersion() {
+	fmt.Println(toolVersion)
+}
+
+func printUsage() {
+	fmt.Println("usage: ttse <start|status|commit|undo|daemon|version>")
 }
 
 func detectCapabilities() (bool, bool, bool) {
